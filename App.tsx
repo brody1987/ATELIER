@@ -66,7 +66,6 @@ const INITIAL_PRODUCTS: Product[] = [
     department: '상품기획 1팀',
     authorUid: 'mock-uid-1'
   },
-  // ... other mock data would be similar ...
 ];
 
 const App: React.FC = () => {
@@ -285,7 +284,13 @@ const App: React.FC = () => {
 
   // View Change Handler (Guard)
   const handleViewChange = (view: 'dashboard' | 'list' | 'detail' | 'production' | 'settings' | 'users') => {
-      if (!hasProfile && (view === 'list' || view === 'production' || view === 'detail')) {
+      // Allow dashboard even without profile
+      if (view === 'dashboard' || view === 'settings') {
+          setCurrentView(view);
+          return;
+      }
+      
+      if (!hasProfile) {
           alert('서비스를 이용하기 위해 설정에서 프로필(부서, 이름)을 먼저 등록해주세요.');
           setCurrentView('settings');
           return;
