@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-import { UserAccount } from '../types';
+import { UserAccount } from '../types.ts';
 import { getDatabase, ref, onValue, update } from 'firebase/database';
 import { Shield, UserX, UserCheck, Search, Loader2 } from 'lucide-react';
 

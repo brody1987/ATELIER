@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Product, Status } from '../types';
+import { Product, Status } from '../types.ts';
 import { CheckCircle2, Clock, AlertCircle, ArrowRight, ArrowLeft, Package } from 'lucide-react';
 
 interface ProductionManagementProps {

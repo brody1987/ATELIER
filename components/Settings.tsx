@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Save, UserCircle, Building, Tag, Trash2, Plus } from 'lucide-react';
-import { UserProfile, UserAccount } from '../types';
+import { UserProfile, UserAccount } from '../types.ts';
 
 interface SettingsProps {
   currentUser: UserAccount;

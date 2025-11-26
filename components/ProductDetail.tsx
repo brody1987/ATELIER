@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Product, Comment, SKUBreakdownItem, UserAccount } from '../types';
+import { Product, Comment, SKUBreakdownItem, UserAccount } from '../types.ts';
 import { ArrowLeft, Save, Upload, Scissors, MessageSquare, Send, Clock, Calculator, Percent, FileText, Tag, Package, RefreshCw, ChevronUp, ChevronDown, Calendar, Link as LinkIcon, FileType, Lock } from 'lucide-react';
 
 interface ProductDetailProps {

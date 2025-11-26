@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { Product, Category, UserAccount } from '../types';
+import { Product, Category, UserAccount } from '../types.ts';
 import { Search, Plus, Filter, Trash2, Edit, Download, Archive, Calculator, X, FileText, Maximize2, Scissors, RotateCcw, ArrowUp, ArrowDown, User } from 'lucide-react';
 import * as XLSX from 'xlsx';
 

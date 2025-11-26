@@ -1,6 +1,5 @@
-
 import React, { useMemo } from 'react';
-import { Product } from '../types';
+import { Product } from '../types.ts';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend, Line, LineChart

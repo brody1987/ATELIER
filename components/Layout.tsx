@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { LayoutDashboard, Shirt, Settings, LogOut, Scissors, Users } from 'lucide-react';
-import { UserAccount } from '../types';
+import { UserAccount } from '../types.ts';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface LayoutProps {
