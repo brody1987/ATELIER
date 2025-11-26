@@ -84,7 +84,7 @@ const ProductDetailRoute: React.FC<{
 }
 
 // Route wrapper for checking profile completion
-const RequireProfile = ({ hasProfile, children }: { hasProfile: boolean; children: React.ReactNode }) => {
+const RequireProfile = ({ hasProfile, children }: { hasProfile: boolean; children?: React.ReactNode }) => {
   if (!hasProfile) {
     // Allow accessing settings even without profile to set it up
     return <Navigate to="/settings" replace />;
