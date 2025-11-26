@@ -2,16 +2,24 @@
 import React from 'react';
 import { LayoutDashboard, Shirt, Settings, LogOut, Scissors, Users } from 'lucide-react';
 import { UserAccount } from '../types';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface LayoutProps {
   children: React.ReactNode;
-  currentView: string;
-  onChangeView: (view: string) => void;
   user?: UserAccount | null;
   onLogout: () => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView, user, onLogout }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
+
+  const isActive = (path: string) => {
+    if (path === '/') return currentPath === '/';
+    return currentPath.startsWith(path);
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-stone-50">
       {/* Sidebar */}
@@ -28,9 +36,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <button
-            onClick={() => onChangeView('dashboard')}
+            onClick={() => navigate('/')}
             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-              currentView === 'dashboard'
+              isActive('/')
                 ? 'bg-stone-900 text-white shadow-md'
                 : 'text-stone-600 hover:bg-stone-100'
             }`}
@@ -40,9 +48,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
           </button>
           
           <button
-            onClick={() => onChangeView('list')}
+            onClick={() => navigate('/products')}
             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-              ['list', 'detail'].includes(currentView)
+              isActive('/products')
                 ? 'bg-stone-900 text-white shadow-md'
                 : 'text-stone-600 hover:bg-stone-100'
             }`}
@@ -52,9 +60,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
           </button>
 
           <button 
-            onClick={() => onChangeView('production')}
+            onClick={() => navigate('/production')}
             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-              currentView === 'production'
+              isActive('/production')
                 ? 'bg-stone-900 text-white shadow-md'
                 : 'text-stone-600 hover:bg-stone-100'
             }`}
@@ -66,9 +74,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
           {/* Admin Only Menu */}
           {user?.role === 'admin' && (
             <button 
-              onClick={() => onChangeView('users')}
+              onClick={() => navigate('/users')}
               className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                currentView === 'users'
+                isActive('/users')
                   ? 'bg-stone-900 text-white shadow-md'
                   : 'text-stone-600 hover:bg-stone-100'
               }`}
@@ -81,9 +89,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
 
         <div className="p-4 border-t border-stone-100 space-y-2">
           <button 
-             onClick={() => onChangeView('settings')}
+             onClick={() => navigate('/settings')}
              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-              currentView === 'settings'
+              isActive('/settings')
                 ? 'bg-stone-900 text-white shadow-md'
                 : 'text-stone-600 hover:bg-stone-100'
             }`}

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
@@ -13,6 +12,7 @@ import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, set, push, update, get, runTransaction } from 'firebase/database';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 
 // Default Config provided by user (Fallback if localStorage is empty)
 const DEFAULT_FIREBASE_CONFIG: FirebaseConfig = {
@@ -68,10 +68,33 @@ const INITIAL_PRODUCTS: Product[] = [
   },
 ];
 
+// Route wrapper for editing to extract ID
+const ProductDetailRoute: React.FC<{
+  products: Product[];
+  currentUser: UserAccount;
+  onSave: any;
+  onCancel: any;
+  isLoading: boolean;
+  brands: string[];
+  generateNextSku: any;
+}> = (props) => {
+  const { id } = useParams();
+  const product = props.products.find(p => p.id === id);
+  return <ProductDetail product={product} {...props} />;
+}
+
+// Route wrapper for checking profile completion
+const RequireProfile = ({ hasProfile, children }: { hasProfile: boolean; children: React.ReactNode }) => {
+  if (!hasProfile) {
+    // Allow accessing settings even without profile to set it up
+    return <Navigate to="/settings" replace />;
+  }
+  return <>{children}</>;
+};
+
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'list' | 'detail' | 'production' | 'settings' | 'users'>('dashboard');
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [firebaseApp, setFirebaseApp] = useState<any>(null);
   const [db, setDb] = useState<any>(null);
   const [storage, setStorage] = useState<any>(null);
@@ -136,7 +159,6 @@ const App: React.FC = () => {
                 }
                 
                 // Safety check: ensure required profile fields are at least empty strings
-                // This prevents 'undefined' values causing hasProfile to be false on new devices
                 if (!currentUserData.name) currentUserData.name = firebaseUser.displayName || '';
                 if (!currentUserData.department) currentUserData.department = '';
 
@@ -152,7 +174,6 @@ const App: React.FC = () => {
                   role: 'user', // Default role
                   status: 'active',
                   lastLogin: new Date().toISOString(),
-                  // Initialize profile fields as empty or partial from Google
                   name: firebaseUser.displayName || '',
                   department: ''
                 };
@@ -182,22 +203,20 @@ const App: React.FC = () => {
   // Effect to Update Role based on Login Intent
   useEffect(() => {
     if (userAccount && pendingRole && db) {
-      // Only update if the current role differs from the intended login role
       if (userAccount.role !== pendingRole) {
         const updateRole = async () => {
           try {
             await update(ref(db, `users/${userAccount.uid}`), { role: pendingRole });
             setUserAccount(prev => prev ? { ...prev, role: pendingRole } : null);
-            console.log(`User role updated to: ${pendingRole}`);
           } catch (e) {
             console.error("Failed to update user role", e);
           } finally {
-            setPendingRole(null); // Reset flag
+            setPendingRole(null);
           }
         };
         updateRole();
       } else {
-        setPendingRole(null); // Reset flag if already matches
+        setPendingRole(null);
       }
     }
   }, [userAccount, pendingRole, db]);
@@ -206,7 +225,6 @@ const App: React.FC = () => {
   // Sync Products and Brands Data from Firebase
   useEffect(() => {
     if (db && userAccount) {
-      // Products
       const productsRef = ref(db, 'products');
       const unsubscribeProducts = onValue(productsRef, (snapshot) => {
         const data = snapshot.val();
@@ -221,27 +239,20 @@ const App: React.FC = () => {
         }
       });
 
-      // Brands
       const brandsRef = ref(db, 'settings/brands');
       const unsubscribeBrands = onValue(brandsRef, (snapshot) => {
         const data = snapshot.val();
         if (data && Array.isArray(data)) {
           setBrands(data);
         }
-        // If null, keep defaults
       });
 
-      // Listen for current user profile updates (in case changed from another device)
       const userRef = ref(db, `users/${userAccount.uid}`);
       const unsubscribeUser = onValue(userRef, (snapshot) => {
         if (snapshot.exists()) {
             const updatedUser = snapshot.val();
-            
-            // Ensure fields exist to maintain hasProfile consistency
             if (!updatedUser.name) updatedUser.name = updatedUser.displayName || '';
             if (!updatedUser.department) updatedUser.department = '';
-
-            // Only update if there are changes to avoid loops (though React state check handles this)
             setUserAccount(updatedUser);
         }
       });
@@ -252,7 +263,7 @@ const App: React.FC = () => {
         unsubscribeUser();
       };
     }
-  }, [db, userAccount?.uid]); // Depend on UID to restart listeners on login
+  }, [db, userAccount?.uid]);
 
   const handleUpdateBrands = async (newBrands: string[]) => {
     if (db && userAccount?.role === 'admin') {
@@ -274,7 +285,6 @@ const App: React.FC = () => {
                 name: profile.name,
                 department: profile.department
             });
-            // Local state update happens via onValue listener
         } catch (e) {
             console.error("Failed to update profile", e);
             throw e;
@@ -282,33 +292,13 @@ const App: React.FC = () => {
     }
   };
 
-  // View Change Handler (Guard)
-  const handleViewChange = (view: 'dashboard' | 'list' | 'detail' | 'production' | 'settings' | 'users') => {
-      // Allow dashboard even without profile
-      if (view === 'dashboard' || view === 'settings') {
-          setCurrentView(view);
-          return;
-      }
-      
-      if (!hasProfile) {
-          alert('서비스를 이용하기 위해 설정에서 프로필(부서, 이름)을 먼저 등록해주세요.');
-          setCurrentView('settings');
-          return;
-      }
-      setCurrentView(view);
-  };
-
   // Auth Actions
   const handleGoogleLogin = async (isAdminMode: boolean) => {
     if (!firebaseApp) return;
     setIsLoading(true);
-    
-    // Set intended role based on login mode
     setPendingRole(isAdminMode ? 'admin' : 'user');
-
     const auth = getAuth(firebaseApp);
     const provider = new GoogleAuthProvider();
-    
     try {
       await signInWithPopup(auth, provider);
     } catch (error) {
@@ -334,43 +324,28 @@ const App: React.FC = () => {
 
   // Generate Next SKU
   const generateNextSku = async (brand: string): Promise<string> => {
-    // Prefix Mapping
     const prefixMap: Record<string, string> = {
       '밸롭': 'B',
       '웨이든': 'W',
       '부기프리': 'F',
       '파스티야': 'P'
     };
-    const prefix = prefixMap[brand] || 'X'; // Default X if unknown
+    const prefix = prefixMap[brand] || 'X';
 
-    if (!db) return `${prefix}00000000`; // Fallback if no DB
+    if (!db) return `${prefix}00000000`;
 
     const counterRef = ref(db, `skuCounters/${prefix}`);
-    
     try {
       const result = await runTransaction(counterRef, (currentValue) => {
         return (currentValue || 0) + 1;
       });
-      
       const count = result.snapshot.val();
-      // Format to 8 digits (e.g. 00000001)
       const paddedCount = String(count).padStart(8, '0');
       return `${prefix}${paddedCount}`;
     } catch (error) {
       console.error("SKU Generation Failed", error);
       return `${prefix}ERR`; 
     }
-  };
-
-  // CRUD Actions
-  const handleAddProduct = () => {
-    setEditingProductId(null);
-    handleViewChange('detail');
-  };
-
-  const handleEditProduct = (id: string) => {
-    setEditingProductId(id);
-    handleViewChange('detail');
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -403,28 +378,15 @@ const App: React.FC = () => {
     setIsLoading(true);
     let updatedProduct = { ...product };
     
-    // Assign Author Info if missing (Check Author Name specifically, regardless of ID length)
     if (!updatedProduct.author || updatedProduct.author.trim() === '') {
       updatedProduct.authorUid = userAccount?.uid;
-      
-      // Use Profile Data from Persistent DB (UserAccount)
-      if (userAccount?.name) {
-        updatedProduct.author = userAccount.name;
-      }
-      if (userAccount?.department) {
-        updatedProduct.department = userAccount.department;
-      }
-      
-      // Fallback to Google Display Name if still empty
-      if (!updatedProduct.author && userAccount?.displayName) {
-        updatedProduct.author = userAccount.displayName;
-      }
+      if (userAccount?.name) updatedProduct.author = userAccount.name;
+      if (userAccount?.department) updatedProduct.department = userAccount.department;
+      if (!updatedProduct.author && userAccount?.displayName) updatedProduct.author = userAccount.displayName;
     }
 
     try {
-      // 1. Upload Images if exists and Firebase connected
       if (storage && userAccount) {
-        // Image Uploads
         if (designFile) {
            const storageReference = storageRef(storage, `designs/${Date.now()}_${designFile.name}`);
            await uploadBytes(storageReference, designFile);
@@ -445,7 +407,6 @@ const App: React.FC = () => {
            await uploadBytes(storageReference, tagFile);
            updatedProduct.tagImage = await getDownloadURL(storageReference);
         }
-        // PDF Plan Upload
         if (planFile) {
             const storageReference = storageRef(storage, `plans/${Date.now()}_${planFile.name}`);
             await uploadBytes(storageReference, planFile);
@@ -453,92 +414,37 @@ const App: React.FC = () => {
         }
       }
 
-      // 2. Save Data
       if (db && userAccount) {
         if (!updatedProduct.id || updatedProduct.id.length > 10) { 
-           // If generated by UUID (36 chars) or new -> Push to Firebase
-           // Check if it already exists in our list to decide update vs push is tricky with UUIDs from client.
-           // Strategy: If editingProductId is set, UPDATE. Else PUSH.
-           if (editingProductId) {
+           // New or UUID
+           const productsList = products; // Current State
+           const exists = productsList.some(p => p.id === updatedProduct.id);
+           
+           if (exists) {
                 await set(ref(db, `products/${updatedProduct.id}`), updatedProduct);
            } else {
-                // New Product
                 const newRef = push(ref(db, 'products'));
                 updatedProduct.id = newRef.key as string;
                 await set(newRef, updatedProduct);
            }
         } else {
-           // For mock IDs (length <= 10), just overwrite
            await set(ref(db, `products/${updatedProduct.id}`), updatedProduct);
         }
       } else {
-        // Local State Fallback
-        if (editingProductId) {
-            setProducts(prev => prev.map(p => p.id === editingProductId ? updatedProduct : p));
+        const index = products.findIndex(p => p.id === updatedProduct.id);
+        if (index > -1) {
+             setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
         } else {
-            setProducts(prev => [...prev, updatedProduct]);
+             setProducts(prev => [...prev, updatedProduct]);
         }
       }
 
-      handleViewChange('list');
+      navigate('/products');
     } catch (error) {
         console.error("Save failed", error);
         alert("저장에 실패했습니다. Firebase 설정을 확인해주세요.");
     } finally {
         setIsLoading(false);
-    }
-  };
-
-  // Render Logic
-  const renderContent = () => {
-    switch (currentView) {
-      case 'dashboard':
-        return <Dashboard products={products} />;
-      case 'list':
-        return (
-          <ProductList 
-            products={products}
-            currentUser={userAccount!}
-            onAddProduct={handleAddProduct}
-            onEditProduct={handleEditProduct}
-            onDeleteProduct={handleDeleteProduct}
-            onUpdateProduct={handleUpdateProduct}
-          />
-        );
-      case 'detail':
-        const editingProduct = products.find(p => p.id === editingProductId);
-        return (
-          <ProductDetail 
-            product={editingProduct}
-            currentUser={userAccount!}
-            onSave={handleSaveProduct}
-            onCancel={() => handleViewChange('list')}
-            isLoading={isLoading}
-            brands={brands}
-            generateNextSku={generateNextSku}
-          />
-        );
-      case 'production':
-        return (
-          <ProductionManagement 
-            products={products}
-            onUpdateStatus={handleUpdateStatus}
-          />
-        );
-      case 'users':
-        return userAccount?.role === 'admin' ? <UserManagement currentUser={userAccount} /> : <Dashboard products={products} />;
-      case 'settings':
-          return (
-              <Settings 
-                currentUser={userAccount!}
-                onUpdateProfile={handleUpdateProfile}
-                brands={brands}
-                onUpdateBrands={handleUpdateBrands}
-                isAdmin={userAccount?.role === 'admin'}
-              />
-          )
-      default:
-        return <Dashboard products={products} />;
     }
   };
 
@@ -555,13 +461,75 @@ const App: React.FC = () => {
   }
 
   return (
-    <Layout 
-      currentView={currentView} 
-      onChangeView={(view) => handleViewChange(view as any)}
-      user={userAccount}
-      onLogout={handleLogout}
-    >
-      {renderContent()}
+    <Layout user={userAccount} onLogout={handleLogout}>
+      <Routes>
+        <Route path="/" element={<Dashboard products={products} />} />
+        
+        <Route path="/products" element={
+            <RequireProfile hasProfile={hasProfile}>
+                <ProductList 
+                    products={products}
+                    currentUser={userAccount}
+                    onAddProduct={() => navigate('/products/new')}
+                    onEditProduct={(id) => navigate(`/products/${id}`)}
+                    onDeleteProduct={handleDeleteProduct}
+                    onUpdateProduct={handleUpdateProduct}
+                />
+            </RequireProfile>
+        } />
+
+        <Route path="/products/new" element={
+            <RequireProfile hasProfile={hasProfile}>
+                <ProductDetail 
+                    currentUser={userAccount}
+                    onSave={handleSaveProduct}
+                    onCancel={() => navigate('/products')}
+                    isLoading={isLoading}
+                    brands={brands}
+                    generateNextSku={generateNextSku}
+                />
+            </RequireProfile>
+        } />
+
+        <Route path="/products/:id" element={
+            <RequireProfile hasProfile={hasProfile}>
+                <ProductDetailRoute 
+                    products={products}
+                    currentUser={userAccount}
+                    onSave={handleSaveProduct}
+                    onCancel={() => navigate('/products')}
+                    isLoading={isLoading}
+                    brands={brands}
+                    generateNextSku={generateNextSku}
+                />
+            </RequireProfile>
+        } />
+
+        <Route path="/production" element={
+            <RequireProfile hasProfile={hasProfile}>
+                <ProductionManagement 
+                    products={products}
+                    onUpdateStatus={handleUpdateStatus}
+                />
+            </RequireProfile>
+        } />
+        
+        <Route path="/users" element={
+            userAccount.role === 'admin' ? <UserManagement currentUser={userAccount} /> : <Navigate to="/" />
+        } />
+
+        <Route path="/settings" element={
+            <Settings 
+                currentUser={userAccount}
+                onUpdateProfile={handleUpdateProfile}
+                brands={brands}
+                onUpdateBrands={handleUpdateBrands}
+                isAdmin={userAccount.role === 'admin'}
+            />
+        } />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </Layout>
   );
 };
